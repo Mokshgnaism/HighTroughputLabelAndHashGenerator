@@ -15,7 +15,7 @@ public class Main {
     public static final byte[] POISON = new byte[]{-1};
 
     public static void main(String[] args) throws IOException, InterruptedException {
-
+        Long start = System.nanoTime();
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl("jdbc:postgresql://localhost:5432/testdb");
         config.setUsername("postgres");
@@ -46,8 +46,6 @@ public class Main {
 
 
         List<CompletableFuture<Void>> db1 = new ArrayList<>();
-//        List<CompletableFuture<Void>> db2 = new ArrayList<>();
-//        List<CompletableFuture<Void>>  db3 = new ArrayList<>();
 
         int chunk = (noOfPallets + palletWorkers - 1) / palletWorkers;
         ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -57,7 +55,7 @@ public class Main {
             int startIdx = i * chunk;
             int endIdx = Math.min(startIdx + chunk, noOfPallets);
             PipedOutputStream pos = new PipedOutputStream();
-            PipedInputStream pis = new PipedInputStream(pos);
+            PipedInputStream pis = new PipedInputStream(pos,1024*64);
 
             palletCFS.add(CompletableFuture.runAsync(() -> {
                 try {
@@ -72,7 +70,7 @@ public class Main {
                     conn.setAutoCommit(false);
                     BaseConnection baseConnection = conn.unwrap(BaseConnection.class);
                     CopyManager copyManager = new CopyManager(baseConnection);
-                    copyManager.copyIn("COPY pallets(ssic,hash,hash_prefix) FROM STDIN WITH (FORMAT BINARY) ",pis);
+                    copyManager.copyIn("COPY pallets(ssic,hash,hash_prefix) FROM STDIN WITH CSV",pis);
                     conn.commit();
                 }catch(Exception e){
                     e.printStackTrace();
@@ -101,7 +99,7 @@ public class Main {
                     conn.setAutoCommit(false);
                     BaseConnection baseConnection = conn.unwrap(BaseConnection.class);
                     CopyManager copyManager = new CopyManager(baseConnection);
-                    copyManager.copyIn("COPY cartons(serial_id,parent_pallet_id,hash,hash_prefix) FROM STDIN WITH (FORMAT BINARY)",pis);
+                    copyManager.copyIn("COPY cartons(serial_id,parent_pallet_id,hash,hash_prefix) FROM STDIN WITH CSV",pis);
                     conn.commit();
                 }catch(Exception e){
                     throw new RuntimeException(e);
@@ -127,7 +125,7 @@ public class Main {
                     conn.setAutoCommit(false);
                     BaseConnection baseConnection = conn.unwrap(BaseConnection.class);
                     CopyManager copyManager = new CopyManager(baseConnection);
-                    copyManager.copyIn("COPY units(serial_id,parent_carton_id,hash,hash_prefix) FROM STDIN WITH (FORMAT BINARY)",pis);
+                    copyManager.copyIn("COPY units(serial_id,parent_carton_id,hash,hash_prefix) FROM STDIN WITH CSV",pis);
                     conn.commit();
                 }catch(Exception e){
                     throw new RuntimeException(e);
@@ -153,8 +151,7 @@ public class Main {
 
         CompletableFuture<Void> alldbs = CompletableFuture.allOf(db1.toArray(new CompletableFuture[db1.size()]));
         alldbs.join();
-
-
-
+        Long end =  System.nanoTime();
+        System.out.println("Total execution time: "+(end-start)/1000000);
     }
 }

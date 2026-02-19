@@ -18,34 +18,21 @@ import java.util.concurrent.ArrayBlockingQueue;
 
 public class LabelGenerator {
 
-    private static void writeByteaText(OutputStream w, byte[] data, int len) throws IOException {
+    private static final byte[] HEX =
+            "0123456789abcdef".getBytes(StandardCharsets.US_ASCII);
 
-        for(int i=0;i<len;i++){
-            int b = data[i] & 0xFF;
+    private static void writeByteaHex(OutputStream w, byte[] data, int len) throws IOException {
 
-            if(b == '\\'){
-                w.write('\\'); w.write('\\');
-            }
-            else if(b == '\t'){
-                w.write('\\'); w.write('t');
-            }
-            else if(b == '\n'){
-                w.write('\\'); w.write('n');
-            }
-            else if(b == '\r'){
-                w.write('\\'); w.write('r');
-            }
-            else if(b < 32 || b > 126){
-                w.write('\\');
-                w.write('0' + ((b >> 6) & 7));
-                w.write('0' + ((b >> 3) & 7));
-                w.write('0' + (b & 7));
-            }
-            else{
-                w.write(b);
-            }
+        w.write('\\');   // \
+        w.write('x');    // x
+
+        for (int i = 0; i < len; i++) {
+            int v = data[i] & 0xFF;
+            w.write(HEX[v >>> 4]);
+            w.write(HEX[v & 0x0F]);
         }
     }
+
 
     private static int writeIntAscii(int value, byte[] buffer, int offset) {
         if (value == 0) {
@@ -75,13 +62,13 @@ public class LabelGenerator {
         LabelCrypto.prefix = prefixBytes;
 //        we can use the streaming version for the hash api we will see which one is better .. later for now lets keep it simple and move on withour current one
 //        and both are having literally equal tradeoff . but if prefix length is dominant i think i should considder going for the streaimign api only
-        final byte comma = '\t';
+        final byte comma = ',';
         final byte newLine = '\n';
         BufferedOutputStream writer = new BufferedOutputStream(pos,1024*64);
         byte []payloadBuffer = new byte[prefixBytes.length+10];
         System.arraycopy(prefixBytes, 0, payloadBuffer, 0, prefixBytes.length);
         int prefixBytelength = prefixBytes.length;
-        for(int i=start; i<=end; i++){
+        for(int i=start; i<end; i++){
             int len = writeIntAscii(i,payloadBuffer,prefixBytelength);
             int totalLen = prefixBytelength + len;
 
@@ -91,13 +78,16 @@ public class LabelGenerator {
 
             PalletQueue.put(payload); // array blocking queue it is .
 
-            writer.write(payload);
+//            writer.write(payload);
+            writeByteaHex(writer,payload,payload.length);
             writer.write(comma);
 
-            writer.write(hash);
+//            writer.write(hash);
+            writeByteaHex(writer,hash,hash.length);
             writer.write(comma);
 
-            writer.write(hash, 0, Math.min(8, hash.length));
+//            writer.write(hash, 0, Math.min(8, hash.length));
+            writeByteaHex(writer,hash,Math.min(8, hash.length));
             writer.write(newLine);
 
         }
@@ -130,17 +120,22 @@ public class LabelGenerator {
                 byte[] payload = Arrays.copyOf(payloadBuffer, totalLen);
                 byte [] hash = LabelCrypto.getHashInBytes(payload);
                 cartonQueue.put(payload);
-                writer.write(payload);
+
+                writeByteaHex(writer,payload,payload.length);
+//                writer.write(payload);
                 writer.write(comma);
 
-                writer.write(parentPaletSerialId);
+//                writer.write(parentPaletSerialId);
+                writeByteaHex(writer,parentPaletSerialId,parentPaletSerialId.length);
                 writer.write(comma);
 
-                writer.write(hash);
+//                writer.write(hash);
+                writeByteaHex(writer,hash,hash.length);
                 writer.write(comma);
 
-                writer.write(hash, 0, Math.min(8, hash.length));
+                writeByteaHex(writer,hash,Math.min(8, hash.length));
                 writer.write(newline);
+
             }
 
         }
@@ -168,18 +163,19 @@ public class LabelGenerator {
                 byte[] payload = Arrays.copyOf(payloadBuffer, totalLen);
                 byte [] hash = LabelCrypto.getHashInBytes(payload);
 
-                writer.write(payload);
+//                writer.write(payload);
+                writeByteaHex(writer,payload,payload.length);
                 writer.write(comma);
 
-                writer.write(parentCartonSerialId);
+//                writer.write(parentCartonSerialId);
+                writeByteaHex(writer,parentCartonSerialId,parentCartonSerialId.length);
                 writer.write(comma);
 
-                writer.write(hash);
+                writeByteaHex(writer,hash,hash.length);
                 writer.write(comma);
 
-                writer.write(hash, 0, Math.min(8, hash.length));
+                writeByteaHex(writer,hash,Math.min(8, hash.length));
                 writer.write(newline);
-
             }
         }
         writer.close();
